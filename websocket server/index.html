@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turn-based Chess-like Game</title>
+    <style>
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(5, 50px);
+            gap: 5px;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #333;
+            text-align: center;
+            line-height: 50px;
+            font-size: 1.5em;
+        }
+        .playerA {
+            color: blue;
+        }
+        .playerB {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameBoard"></div>
+    <button id="moveBtn" onclick="makeMove()">Make Move</button>
+    <p id="status"></p>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:8080');
+        let currentPlayer = 'A';
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ type: 'initialize' }));
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'gameState') {
+                renderGameState(data.state);
+            } else if (data.type === 'invalidMove') {
+                alert(data.message);
+            }
+        };
+
+        function renderGameState(state) {
+            const gameBoard = document.getElementById('gameBoard');
+            gameBoard.innerHTML = '';
+
+            // Clear the board first
+            for (let y = 0; y < 5; y++) {
+                for (let x = 0; x < 5; x++) {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+                    gameBoard.appendChild(cellDiv);
+                }
+            }
+
+            // Place pieces
+            Object.entries(state.players.A.pieces).forEach(([piece, pos]) => {
+                const cell = gameBoard.children[pos.y * 5 + pos.x];
+                cell.innerText = piece;
+                cell.classList.add('playerA');
+            });
+
+            Object.entries(state.players.B.pieces).forEach(([piece, pos]) => {
+                const cell = gameBoard.children[pos.y * 5 + pos.x];
+                cell.innerText = piece;
+                cell.classList.add('playerB');
+            });
+
+            const status = document.getElementById('status');
+            if (state.gameOver) {
+                status.innerText = `Game Over! Winner: Player ${state.winner}`;
+                document.getElementById('moveBtn').disabled = true;
+            } else {
+                status.innerText = `Current Turn: Player ${state.currentPlayer}`;
+            }
+        }
+
+        function makeMove() {
+            const move = prompt("Enter your move in the format 'P1:U' for Player A (U: Up, D: Down, L: Left, R: Right):");
+            const [piece, direction] = move.split(':');
+            ws.send(JSON.stringify({ type: 'move', player: currentPlayer, piece: piece, direction: direction }));
+        }
+    </script>
+</body>
+</html>
